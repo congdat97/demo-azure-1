@@ -1,0 +1,46 @@
+# Visual Studio
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Rider
+*.iml
+*.ipr
+*.iws
+
+# ASP.NET
+appsettings.*.json
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+*.dll
+*.exe
+
+# Publish
+publish/
+out/
+
+# Others
+*.swp
+*.tmp
+*.bak
+*.log
+*.db
+*.DS_Store
+Thumbs.db
+
+# JetBrains cache
+.idea/
+*.sln.iml

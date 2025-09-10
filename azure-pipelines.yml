@@ -1,0 +1,95 @@
+trigger:
+  branches:
+    include:
+    - main
+
+pool:
+  name: 'my-pool'
+
+variables:
+- group: GitHub-Secrets
+- name: buildConfiguration
+  value: Release
+
+
+stages:
+# ==============================
+# Stage 1: Build
+# ============================== 
+- stage: Build
+  displayName: "Build .NET Project"
+  jobs:
+  - job: BuildJob
+    # condition: contains(variables['Build.SourceVersionMessage'], 'build')
+    displayName: "Build and Test"
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.0.x'
+
+    - script: dotnet restore
+      displayName: 'Restore NuGet packages'
+
+    - script: dotnet build --configuration $(buildConfiguration)
+      displayName: 'Build project'
+
+    - script: dotnet test --configuration $(buildConfiguration) --no-build
+      displayName: 'Run unit tests'
+
+    - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/publish
+      displayName: 'Publish project'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+# ==============================
+# Stage 2: Deploy
+# ==============================
+- stage: Deploy
+  # condition: contains(variables['Build.SourceVersionMessage'], 'deploy')
+  displayName: "Deploy to Render"
+  dependsOn: Build
+  condition: succeeded()   # chỉ chạy khi Build stage thành công
+  jobs:
+  - job: DeployJob
+    displayName: "Push to GitHub (Render will auto-deploy)"
+    steps:
+    - download: current
+      artifact: drop
+
+    - powershell: |
+        # Xóa .git cũ nếu có
+        if (Test-Path ".git") { Remove-Item -Recurse -Force ".git" }
+
+        git config --global user.email "$env:GITHUB_EMAIL"
+        git config --global user.name "$env:GITHUB_USER"
+
+        git init
+        git remote add origin https://$env:GITHUB_TOKEN@github.com/$env:GITHUB_USER/$env:GITHUB_REPO_DEMO_1.git
+
+        # Copy artifact từ Build stage
+        xcopy "$(Pipeline.Workspace)\drop\*" . /E /Y
+
+        # Add và commit
+        git add .
+        git commit -m "Deploy from Azure Pipeline - $(Build.BuildId)"
+
+        # Tạo branch nếu chưa có, push force lên remote
+        git branch -M $env:GITHUB_BRANCH
+        git push origin $env:GITHUB_BRANCH --force
+
+      displayName: 'Deploy to GitHub'
+      env:
+        GITHUB_EMAIL: $(GITHUB_EMAIL)           # từ Variable Group
+        GITHUB_USER: $(GITHUB_USER)             # từ Variable Group
+        GITHUB_TOKEN: $(GITHUB_TOKEN)           # từ Variable Group (Personal Access Token)
+        GITHUB_REPO_DEMO_1: $(GITHUB_REPO_DEMO_1) # repo GitHub
+        GITHUB_BRANCH: $(GITHUB_BRANCH)         # branch deploy
+
+
+
+
